@@ -187,8 +187,12 @@ else
     info "Clonando configuraciones externas..."
     run mkdir -p "${HOME}/github"
 
-    # NvChad starter
-    if [ ! -d "${HOME}/.config/nvim" ]; then
+    # NvChad starter: solo si el repo NO trae su propia config de nvim.
+    # Si ambos se aplican, la etapa 6 copia Config/nvim encima del clon y
+    # queda una mezcla de dos configuraciones distintas.
+    if [ -d "${RUTA}/Config/nvim" ]; then
+        ok "El repo trae su propia config de nvim; omito el clon de NvChad."
+    elif [ ! -d "${HOME}/.config/nvim" ]; then
         run git clone https://github.com/NvChad/starter "${HOME}/.config/nvim"
     else
         warn "~/.config/nvim ya existe, no lo toco."
@@ -233,10 +237,19 @@ if done_step "fuentes"; then
 else
     info "Instalando fuentes..."
     run sudo mkdir -p /usr/local/share/fonts /usr/share/fonts/truetype
-    [ -d "${RUTA}/fonts/HNF" ] && \
-        run sudo cp -v "${RUTA}"/fonts/HNF/* /usr/local/share/fonts/
-    [ -d "${RUTA}/Config/polybar/fonts" ] && \
-        run sudo cp -v "${RUTA}"/Config/polybar/fonts/* /usr/share/fonts/truetype/
+    # Solo archivos de fuente: el directorio del repo también trae LICENSE.md
+    # y readme.md, que no tienen nada que hacer en /usr/local/share/fonts.
+    if [ "$DRY" -eq 0 ]; then
+        find "${RUTA}/fonts/HNF" -maxdepth 1 -type f \
+            \( -iname '*.ttf' -o -iname '*.otf' \) \
+            -exec sudo cp -v {} /usr/local/share/fonts/ \; 2>/dev/null
+        find "${RUTA}/Config/polybar/fonts" -maxdepth 1 -type f \
+            \( -iname '*.ttf' -o -iname '*.otf' \) \
+            -exec sudo cp -v {} /usr/share/fonts/truetype/ \; 2>/dev/null
+    else
+        echo -e "   ${Y}dry-run:${E} copiar $(find "${RUTA}/fonts/HNF" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.otf' \) 2>/dev/null | wc -l) fuentes a /usr/local/share/fonts/"
+        echo -e "   ${Y}dry-run:${E} copiar $(find "${RUTA}/Config/polybar/fonts" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.otf' \) 2>/dev/null | wc -l) fuentes a /usr/share/fonts/truetype/"
+    fi
     run sudo fc-cache -f
     mark_step "fuentes"
     ok "Fuentes instaladas."
