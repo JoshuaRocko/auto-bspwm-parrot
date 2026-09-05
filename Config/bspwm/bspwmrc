@@ -1,7 +1,13 @@
 #! /bin/sh
 
 wmname LG3D &
-vmware-user-suid-wrapper &
+
+# SPICE / VM
+# bspwm no procesa los autostart de XDG, así que el agente de SPICE hay que
+# lanzarlo aquí. Da portapapeles compartido con el host y redimensionado
+# automático de la ventana. (Antes aquí estaba vmware-user-suid-wrapper, que
+# es de VMware y no aplica en KVM/QEMU.)
+command -v spice-vdagent >/dev/null 2>&1 && spice-vdagent &
 
 pgrep -x sxhkd > /dev/null || sxhkd &
 
@@ -20,12 +26,25 @@ bspc rule -a mplayer2 state=floating
 bspc rule -a Kupfer.py focus=on
 bspc rule -a Screenkey manage=off
 
-# RESOLUCION ARANDR
-
+# RESOLUCION
+# La resolución está fijada en el XML de libvirt y spice-vdagent ajusta el
+# resto. Si alguna vez necesitas forzarla, descomenta y ajusta:
+# xrandr --output Virtual-1 --mode 1920x1080 &
 
 # WALLPAPER
-vmware-user-suid-wrapper &
-/usr/bin/feh --bg-fill /usr/share/backgrounds/default.jpg &
+# El original apuntaba a una ruta fija que puede no existir en Parrot 7.3.
+# Esto usa el primer archivo que encuentre y no falla si no hay ninguno.
+for _wp in \
+    "$HOME/.config/wallpaper.jpg" \
+    /usr/share/backgrounds/default.jpg \
+    /usr/share/backgrounds/parrot.jpg \
+    /usr/share/images/desktop-base/default; do
+    if [ -f "$_wp" ]; then
+        feh --bg-fill "$_wp" &
+        break
+    fi
+done
+unset _wp
 
 # POLYBAR
 ~/.config/polybar/launch.sh
@@ -34,7 +53,13 @@ vmware-user-suid-wrapper &
 bspc config focus_follows_pointer true
 
 # PICOM
-picom &
+# Desactivado a propósito: esta VM no tiene aceleración 3D (Mesa usa llvmpipe),
+# así que el compositor lo dibujaría todo por CPU. Es la causa principal de
+# lentitud en el escritorio. Para reactivarlo si algún día hay virgl:
+#   sudo apt install picom  y descomenta la línea de abajo.
+#   Ojo: el picom.conf del repo es para el fork de ibhagwan y probablemente
+#   no parsee con picom 12 de los repos de Debian.
+# picom &
 bspc config border_width 1
 
 xsetroot -cursor_name left_ptr &
